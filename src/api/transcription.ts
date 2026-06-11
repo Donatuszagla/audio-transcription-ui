@@ -11,36 +11,36 @@
  *   3. saveTranscript()     → localStorage backup (no backend endpoint yet)
  * ─────────────────────────────────────────────────────────────────────────────
  */
- 
+
 // Base URL — set VITE_API_URL in .env to override for production
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000';
- 
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://rsbtwsilld8e4l-8000.proxy.runpod.net/';
+
 // How often to poll /status while transcription is running
 const POLL_INTERVAL_MS = 5_000;
- 
+
 // Give up polling after this long (3 hours — enough for the longest sermon)
 const POLL_TIMEOUT_MS = 3 * 60 * 60 * 1_000;
- 
+
 // ─── Types ────────────────────────────────────────────────────────────────────
- 
+
 export interface UploadResult {
   fileId: string;   // job_id from the backend
   fileName: string;
   durationSeconds?: number;
 }
- 
+
 export interface TranscriptionResult {
   jobId: string;
   text: string;
   confidence?: number;
   durationSeconds?: number;
 }
- 
+
 export interface SaveResult {
   savedAt: string;
   transcriptId: string;
 }
- 
+
 // Shape of GET /status/{job_id} response from FastAPI
 interface StatusResponse {
   job_id: string;
@@ -61,9 +61,9 @@ interface StatusResponse {
     };
   } | null;
 }
- 
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
- 
+
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(`${API_BASE}${path}`, init);
   if (!res.ok) {
@@ -76,32 +76,32 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   }
   return res;
 }
- 
+
 /**
  * Poll GET /status/{jobId} every POLL_INTERVAL_MS until done or failed.
  */
 async function pollUntilDone(jobId: string): Promise<StatusResponse> {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
- 
+
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
- 
-    const res  = await apiFetch(`/status/${jobId}`);
+
+    const res = await apiFetch(`/status/${jobId}`);
     const data: StatusResponse = await res.json();
- 
-    if (data.status === 'done')   return data;
+
+    if (data.status === 'done') return data;
     if (data.status === 'failed') throw new Error(data.error ?? 'Transcription failed on server.');
     // 'queued' | 'processing' → keep polling
   }
- 
+
   throw new Error(
     `Transcription timed out after ${POLL_TIMEOUT_MS / 60_000} minutes. ` +
     'The audio may be too long or the server is overloaded.'
   );
 }
- 
+
 // ─── Upload ───────────────────────────────────────────────────────────────────
- 
+
 /**
  * Upload an audio file to POST /transcribe.
  *
@@ -120,22 +120,22 @@ export function uploadAudio(
     formData.append('file', file);
     formData.append('language', 'en');
     formData.append('clean_output', 'true');
- 
+
     const xhr = new XMLHttpRequest();
- 
+
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable) {
         onProgress(Math.round((e.loaded / e.total) * 100));
       }
     });
- 
+
     xhr.addEventListener('load', () => {
       if (xhr.status === 202) {
         try {
           const body = JSON.parse(xhr.responseText);
           onProgress(100);
           resolve({
-            fileId:   body.job_id,   // job_id is used as fileId going forward
+            fileId: body.job_id,   // job_id is used as fileId going forward
             fileName: file.name,
           });
         } catch {
@@ -150,18 +150,18 @@ export function uploadAudio(
         reject(new Error(detail));
       }
     });
- 
-    xhr.addEventListener('error',   () => reject(new Error('Network error — is the API server running?')));
+
+    xhr.addEventListener('error', () => reject(new Error('Network error — is the API server running?')));
     xhr.addEventListener('timeout', () => reject(new Error('Upload timed out.')));
- 
+
     xhr.open('POST', `${API_BASE}/transcribe`);
     xhr.timeout = 30 * 60 * 1_000;   // 30 min ceiling for very large files
     xhr.send(formData);
   });
 }
- 
+
 // ─── Transcription ────────────────────────────────────────────────────────────
- 
+
 /**
  * Poll GET /status/{fileId} until the transcription job finishes.
  *
@@ -172,20 +172,20 @@ export async function startTranscription(
   fileId: string
 ): Promise<TranscriptionResult> {
   const data = await pollUntilDone(fileId);
- 
+
   if (!data.result) {
     throw new Error('Job completed but the server returned no transcript.');
   }
- 
+
   return {
-    jobId:           data.job_id,
-    text:            data.result.text,
+    jobId: data.job_id,
+    text: data.result.text,
     durationSeconds: data.result.duration,
   };
 }
- 
+
 // ─── Save ─────────────────────────────────────────────────────────────────────
- 
+
 /**
  * Save the transcript.
  *
@@ -201,9 +201,9 @@ export async function startTranscription(
  *   return res.json();
  */
 export async function saveTranscript(text: string): Promise<SaveResult> {
-  const savedAt      = new Date().toISOString();
+  const savedAt = new Date().toISOString();
   const transcriptId = `local_${Date.now()}`;
- 
+
   try {
     localStorage.setItem(
       'sermon_transcript_backup',
@@ -212,7 +212,7 @@ export async function saveTranscript(text: string): Promise<SaveResult> {
   } catch {
     // localStorage quota exceeded — ignore silently
   }
- 
+
   return { savedAt, transcriptId };
 }
- 
+
