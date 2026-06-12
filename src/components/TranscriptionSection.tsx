@@ -12,7 +12,9 @@ const TranscriptionSection: React.FC<Props> = ({
   transcriptionStatus,
   onStart,
 }) => {
-  const canStart = uploadStatus === 'done' && transcriptionStatus === 'idle';
+  const canStart =
+    uploadStatus === 'done' &&
+    (transcriptionStatus === 'idle' || transcriptionStatus === 'error');
   const isProcessing = transcriptionStatus === 'processing';
   const isDone = transcriptionStatus === 'done';
 
@@ -49,7 +51,13 @@ const TranscriptionSection: React.FC<Props> = ({
         onClick={onStart}
         disabled={!canStart || isProcessing}
       >
-        {isProcessing ? 'Transcribing…' : isDone ? 'Re-Transcribe' : 'Start Transcription'}
+        {isProcessing
+          ? 'Transcribing…'
+          : isDone
+          ? 'Re-Transcribe'
+          : transcriptionStatus === 'error'
+          ? 'Retry Transcription'
+          : 'Start Transcription'}
       </button>
 
       {isDone && (
