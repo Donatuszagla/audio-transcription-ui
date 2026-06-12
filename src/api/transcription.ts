@@ -13,7 +13,7 @@
  */
 
 // Base URL — set VITE_API_URL in .env to override for production
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://rsbtwsilld8e4l-8000.proxy.runpod.net/';
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'https://rsbtwsilld8e4l-8000.proxy.runpod.net';
 
 // How often to poll /status while transcription is running
 const POLL_INTERVAL_MS = 5_000;
